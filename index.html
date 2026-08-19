@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description"
+    content="Redis Caching Dashboard for Property Listings — manage cache keys, TTL, namespaces, and performance stats for your real-estate data layer." />
+  <title>Redis Cache Manager · Property Listings</title>
+
+  <!-- Preconnect for fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet" />
+
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════
+     App Shell
+══════════════════════════════════════════ -->
+<div class="app-wrapper" role="application" aria-label="Redis Cache Manager">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar" role="navigation" aria-label="Main navigation">
+
+    <!-- Logo -->
+    <div class="sidebar-logo" aria-label="Redis Cache Manager — Property Listings">
+      <div class="logo-icon" aria-hidden="true">⚡</div>
+      <div class="logo-text">
+        <span class="logo-title">Redis Manager</span>
+        <span class="logo-sub">Property Listings</span>
+      </div>
+    </div>
+
+    <!-- Nav -->
+    <nav class="sidebar-nav" aria-label="Dashboard sections">
+      <div class="nav-section-label">Overview</div>
+
+      <button class="nav-item" data-panel="dashboard"
+        aria-label="Dashboard — performance stats"
+        title="Dashboard">
+        <span class="nav-icon" aria-hidden="true">📊</span>
+        <span class="nav-label">Dashboard</span>
+      </button>
+
+      <div class="nav-section-label">Cache Operations</div>
+
+      <button class="nav-item" data-panel="set"
+        aria-label="Set — add or update a cache key"
+        title="SET Key">
+        <span class="nav-icon" aria-hidden="true">➕</span>
+        <span class="nav-label">SET Key</span>
+      </button>
+
+      <button class="nav-item" data-panel="get"
+        aria-label="Get — retrieve a value from cache"
+        title="GET Key">
+        <span class="nav-icon" aria-hidden="true">🔍</span>
+        <span class="nav-label">GET Key</span>
+      </button>
+
+      <button class="nav-item" data-panel="keys"
+        aria-label="Browse all cached keys"
+        title="Browse Keys">
+        <span class="nav-icon" aria-hidden="true">🗂</span>
+        <span class="nav-label">Browse Keys</span>
+        <span class="nav-badge" id="keys-badge" aria-label="total keys">0</span>
+      </button>
+
+      <div class="nav-section-label">Management</div>
+
+      <button class="nav-item" data-panel="ttl"
+        aria-label="TTL Manager — update key expiry"
+        title="TTL Manager">
+        <span class="nav-icon" aria-hidden="true">⏱</span>
+        <span class="nav-label">TTL Manager</span>
+      </button>
+
+      <button class="nav-item" data-panel="audit"
+        aria-label="Audit log — action history"
+        title="Audit Log">
+        <span class="nav-icon" aria-hidden="true">📋</span>
+        <span class="nav-label">Audit Log</span>
+        <span class="nav-badge" id="audit-badge" aria-label="log count">0</span>
+      </button>
+
+      <button class="nav-item" data-panel="flush"
+        aria-label="Flush cache — clear all keys"
+        title="Flush Cache">
+        <span class="nav-icon" aria-hidden="true">🗑</span>
+        <span class="nav-label">Flush Cache</span>
+      </button>
+
+      <div class="nav-section-label">Architecture</div>
+
+      <button class="nav-item" data-panel="erd"
+        aria-label="ERD and API contracts — schema documentation"
+        title="ERD & API">
+        <span class="nav-icon" aria-hidden="true">🗄</span>
+        <span class="nav-label">ERD &amp; API Docs</span>
+      </button>
+    </nav>
+
+    <!-- Footer -->
+    <div class="sidebar-footer">
+      <div class="connection-status" role="status" aria-live="polite">
+        <div class="status-dot" id="status-dot"></div>
+        <span id="status-label">Connecting…</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main ── -->
+  <div class="main-content">
+
+    <!-- Topbar -->
+    <header class="topbar" role="banner">
+      <div>
+        <div class="topbar-title">Redis Cache Manager</div>
+        <div class="topbar-breadcrumb">
+          Property Listings
+          <span aria-hidden="true">›</span>
+          <span id="breadcrumb-current">Dashboard</span>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <div class="search-bar" role="search" aria-label="Quick key lookup">
+          <span class="search-icon" aria-hidden="true">🔍</span>
+          <input type="text"
+            id="global-search"
+            placeholder="Quick search key…"
+            aria-label="Quick search cache key"
+            autocomplete="off"
+            spellcheck="false" />
+        </div>
+        <time class="topbar-time" id="topbar-time" aria-live="off">—</time>
+      </div>
+    </header>
+
+    <!-- ══════ PANELS ══════ -->
+
+    <!-- ── Dashboard ── -->
+    <main id="panel-dashboard" class="panel" role="main" aria-label="Dashboard">
+      <div class="panel-header">
+        <h1>Cache Performance Dashboard</h1>
+        <p>Real-time statistics for the Property Listings Redis cache layer.</p>
+      </div>
+
+      <!-- Stat Cards Row -->
+      <div class="card-grid-4" role="region" aria-label="Cache statistics">
+        <div class="stat-card accent">
+          <span class="stat-icon" aria-hidden="true">🗂</span>
+          <div class="stat-label">Total Keys</div>
+          <div class="stat-value" id="stat-total-keys" aria-live="polite">—</div>
+          <div class="stat-sub">active in cache</div>
+        </div>
+        <div class="stat-card warning">
+          <span class="stat-icon" aria-hidden="true">⏱</span>
+          <div class="stat-label">With TTL</div>
+          <div class="stat-value" id="stat-with-ttl" aria-live="polite">—</div>
+          <div class="stat-sub">will expire</div>
+        </div>
+        <div class="stat-card">
+          <span class="stat-icon" aria-hidden="true">🔒</span>
+          <div class="stat-label">Persistent</div>
+          <div class="stat-value" id="stat-persistent" aria-live="polite">—</div>
+          <div class="stat-sub">no expiry</div>
+        </div>
+        <div class="stat-card">
+          <span class="stat-icon" aria-hidden="true">💾</span>
+          <div class="stat-label">Memory Used</div>
+          <div class="stat-value" id="stat-memory" style="font-size:20px" aria-live="polite">—</div>
+          <div class="stat-sub">localStorage estimate</div>
+        </div>
+      </div>
+
+      <div class="section-title">Hit / Miss Analytics</div>
+
+      <div class="card-grid-4">
+        <div class="stat-card success">
+          <span class="stat-icon" aria-hidden="true">✅</span>
+          <div class="stat-label">Cache Hits</div>
+          <div class="stat-value" id="stat-hits" aria-live="polite">—</div>
+          <div class="stat-sub">successful GETs</div>
+        </div>
+        <div class="stat-card danger">
+          <span class="stat-icon" aria-hidden="true">❌</span>
+          <div class="stat-label">Cache Misses</div>
+          <div class="stat-value" id="stat-misses" aria-live="polite">—</div>
+          <div class="stat-sub">key not found</div>
+        </div>
+        <div class="stat-card">
+          <span class="stat-icon" aria-hidden="true">📝</span>
+          <div class="stat-label">Total SETs</div>
+          <div class="stat-value" id="stat-sets" aria-live="polite">—</div>
+          <div class="stat-sub">write operations</div>
+        </div>
+        <div class="stat-card">
+          <span class="stat-icon" aria-hidden="true">🗑</span>
+          <div class="stat-label">DELETEs</div>
+          <div class="stat-value" id="stat-dels" aria-live="polite">—</div>
+          <div class="stat-sub">keys removed</div>
+        </div>
+      </div>
+
+      <div class="section-title">Hit Rate</div>
+      <div class="card" style="max-width:380px">
+        <div class="hit-rate-ring">
+          <svg class="ring-svg" width="80" height="80" viewBox="0 0 80 80"
+            aria-hidden="true" role="img" aria-label="Hit rate ring chart">
+            <circle class="ring-track" cx="40" cy="40" r="32" />
+            <circle class="ring-fill" id="ring-fill" cx="40" cy="40" r="32" />
+          </svg>
+          <div>
+            <div style="font-size:28px;font-weight:800;letter-spacing:-0.03em"
+              id="stat-hit-rate" aria-live="polite">—</div>
+            <div style="font-size:13px;color:var(--color-muted)">Cache Hit Rate</div>
+            <div style="font-size:12px;color:var(--color-faint);margin-top:4px">
+              Higher is better · target ≥ 80%
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-title">Quick Actions</div>
+      <div class="flex gap-3">
+        <button class="btn btn-primary" onclick="showPanel('set')"
+          aria-label="Go to SET panel to add a cache entry">
+          ➕ Add Cache Entry
+        </button>
+        <button class="btn btn-secondary" onclick="showPanel('keys')"
+          aria-label="Browse all cached keys">
+          🗂 Browse Keys
+        </button>
+        <button class="btn btn-secondary" onclick="refreshDashboard()"
+          aria-label="Refresh dashboard statistics">
+          🔄 Refresh Stats
+        </button>
+      </div>
+    </main>
+
+    <!-- ── SET Panel ── -->
+    <section id="panel-set" class="panel" aria-label="Set Cache Key">
+      <div class="panel-header">
+        <h2>SET — Add / Update Cache Entry</h2>
+        <p>Store a value in the cache with an optional TTL (time-to-live).</p>
+      </div>
+
+      <div class="card" style="max-width:680px;position:relative">
+        <form id="form-set" novalidate aria-label="Set cache key form">
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="set-key">
+                Cache Key <span class="required" aria-hidden="true">*</span>
+              </label>
+              <input
+                type="text"
+                id="set-key"
+                class="form-input"
+                placeholder="e.g. listing:prop:001"
+                aria-label="Cache key"
+                aria-required="true"
+                autocomplete="off"
+                spellcheck="false"
+                maxlength="128" />
+              <span class="form-error" role="alert" id="set-key-error"></span>
+              <span class="form-hint">Allowed: letters, numbers, <code>: . - _ * ?</code></span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="set-namespace">Namespace</label>
+              <select id="set-namespace" class="form-select" aria-label="Cache namespace">
+                <option value="default">default</option>
+                <option value="listings">listings</option>
+                <option value="sessions">sessions</option>
+                <option value="config">config</option>
+                <option value="analytics">analytics</option>
+              </select>
+              <span class="form-hint">Logical grouping for key organisation.</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="set-value">
+              Value <span class="required" aria-hidden="true">*</span>
+            </label>
+            <textarea
+              id="set-value"
+              class="form-textarea"
+              placeholder='Plain text or JSON, e.g. {"title":"3BHK","price":4500000}'
+              aria-label="Cache value"
+              aria-required="true"
+              rows="5"
+              spellcheck="false"></textarea>
+            <span class="form-error" role="alert" id="set-value-error"></span>
+            <span class="form-hint">Accepts plain text or valid JSON. Input is XSS-sanitised before storage.</span>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="set-ttl">
+                TTL (seconds) <span style="color:var(--color-faint);font-weight:400">optional</span>
+              </label>
+              <input
+                type="number"
+                id="set-ttl"
+                class="form-input"
+                placeholder="e.g. 3600 for 1 hour"
+                aria-label="Time to live in seconds"
+                min="1"
+                max="2592000"
+                step="1" />
+              <span class="form-error" role="alert" id="set-ttl-error"></span>
+              <span class="form-hint" id="set-ttl-display" aria-live="polite"></span>
+            </div>
+            <div class="form-group" style="justify-content:flex-end">
+              <div style="margin-top:auto">
+                <div class="form-hint" style="margin-bottom:var(--sp-3)">
+                  Leave TTL blank for a persistent (non-expiring) key.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-footer">
+            <button type="submit" class="btn btn-primary btn-lg"
+              aria-label="Submit: store key in cache">
+              ⚡ Cache Entry
+            </button>
+            <button type="reset" class="btn btn-ghost"
+              aria-label="Reset form to defaults">
+              Reset
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Quick Reference -->
+      <div class="section-title">TTL Quick Reference</div>
+      <div class="card-grid-4" style="max-width:680px">
+        <button class="card card-sm" style="cursor:pointer;text-align:left;border:none;background:var(--color-surface)"
+          onclick="document.getElementById('set-ttl').value=300;document.getElementById('set-ttl').dispatchEvent(new Event('input'))"
+          aria-label="Set TTL to 5 minutes (300 seconds)">
+          <div style="font-size:20px">⚡</div>
+          <div style="font-size:13px;font-weight:600;margin-top:4px">5 min</div>
+          <div style="font-size:11px;color:var(--color-muted)">300 sec — session data</div>
+        </button>
+        <button class="card card-sm" style="cursor:pointer;text-align:left;border:none;background:var(--color-surface)"
+          onclick="document.getElementById('set-ttl').value=3600;document.getElementById('set-ttl').dispatchEvent(new Event('input'))"
+          aria-label="Set TTL to 1 hour (3600 seconds)">
+          <div style="font-size:20px">⏱</div>
+          <div style="font-size:13px;font-weight:600;margin-top:4px">1 hour</div>
+          <div style="font-size:11px;color:var(--color-muted)">3600 sec — listings</div>
+        </button>
+        <button class="card card-sm" style="cursor:pointer;text-align:left;border:none;background:var(--color-surface)"
+          onclick="document.getElementById('set-ttl').value=86400;document.getElementById('set-ttl').dispatchEvent(new Event('input'))"
+          aria-label="Set TTL to 24 hours (86400 seconds)">
+          <div style="font-size:20px">📅</div>
+          <div style="font-size:13px;font-weight:600;margin-top:4px">24 hours</div>
+          <div style="font-size:11px;color:var(--color-muted)">86400 sec — daily cache</div>
+        </button>
+        <button class="card card-sm" style="cursor:pointer;text-align:left;border:none;background:var(--color-surface)"
+          onclick="document.getElementById('set-ttl').value='';document.getElementById('set-ttl-display').textContent=''"
+          aria-label="No TTL — persistent key">
+          <div style="font-size:20px">♾</div>
+          <div style="font-size:13px;font-weight:600;margin-top:4px">Persistent</div>
+          <div style="font-size:11px;color:var(--color-muted)">No expiry — config data</div>
+        </button>
+      </div>
+    </section>
+
+    <!-- ── GET Panel ── -->
+    <section id="panel-get" class="panel" aria-label="Get Cache Key">
+      <div class="panel-header">
+        <h2>GET — Retrieve Cached Value</h2>
+        <p>Look up a key in the cache. Shows cache hit/miss and remaining TTL.</p>
+      </div>
+
+      <div class="card" style="max-width:600px;position:relative">
+        <form id="form-get" novalidate aria-label="Get cache key form">
+          <div class="form-group">
+            <label class="form-label" for="get-key">
+              Cache Key <span class="required" aria-hidden="true">*</span>
+            </label>
+            <input
+              type="text"
+              id="get-key"
+              class="form-input"
+              placeholder="e.g. listing:prop:001"
+              aria-label="Cache key to retrieve"
+              aria-required="true"
+              autocomplete="off"
+              spellcheck="false"
+              maxlength="128" />
+            <span class="form-error" role="alert" id="get-key-error"></span>
+          </div>
+
+          <div class="form-footer">
+            <button type="submit" class="btn btn-primary btn-lg"
+              aria-label="Execute GET command">
+              🔍 Fetch from Cache
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div class="section-title">Result</div>
+      <div id="get-result-box" class="result-box" style="max-width:600px"
+        role="region" aria-label="GET result" aria-live="polite">
+        <span style="color:var(--color-faint);font-size:13px">
+          Enter a key above and press "Fetch from Cache" to see results here.
+        </span>
+      </div>
+    </section>
+
+    <!-- ── Keys Browser Panel ── -->
+    <section id="panel-keys" class="panel" aria-label="Browse Cache Keys">
+      <div class="panel-header">
+        <h2>Browse Keys</h2>
+        <p>Search, inspect, and delete cached keys. Supports glob patterns (* and ?).</p>
+      </div>
+
+      <!-- Search + Refresh -->
+      <div class="flex items-center gap-3 mb-4">
+        <div class="search-bar" role="search" aria-label="Search cache keys by pattern">
+          <span class="search-icon" aria-hidden="true">🔍</span>
+          <input
+            type="text"
+            id="keys-search"
+            placeholder="Pattern e.g. listing:* or *prop*"
+            aria-label="Key search pattern (glob)"
+            autocomplete="off"
+            spellcheck="false" />
+        </div>
+        <button class="btn btn-secondary" onclick="renderKeyBrowser()"
+          aria-label="Refresh key list">
+          🔄 Refresh
+        </button>
+      </div>
+
+      <!-- Namespace filter pills -->
+      <div id="ns-pills" class="ns-pills" role="group" aria-label="Filter by namespace"></div>
+
+      <!-- Key list -->
+      <div class="table-wrapper" style="position:relative">
+        <!-- Table header -->
+        <div style="display:flex;padding:var(--sp-3) var(--sp-4);border-bottom:1px solid var(--color-border)">
+          <span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--color-faint);flex:0 0 200px">Key</span>
+          <span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--color-faint);flex:1">Value Preview</span>
+          <span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--color-faint);flex:0 0 90px;margin-right:var(--sp-3)">Namespace</span>
+          <span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--color-faint);flex:0 0 90px">TTL</span>
+          <span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--color-faint);flex:0 0 100px;text-align:right">Actions</span>
+        </div>
+        <div id="keys-list-wrap" role="list" aria-label="Cached keys" aria-live="polite">
+          <!-- Rendered by JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ── TTL Manager Panel ── -->
+    <section id="panel-ttl" class="panel" aria-label="TTL Manager">
+      <div class="panel-header">
+        <h2>TTL Manager</h2>
+        <p>Update or remove expiry on existing cache keys.</p>
+      </div>
+
+      <div class="card-grid-2" style="max-width:720px">
+        <!-- EXPIRE form -->
+        <div class="card" style="position:relative">
+          <h3 style="font-size:15px;font-weight:700;margin-bottom:var(--sp-4)">
+            ⏱ Update TTL (EXPIRE)
+          </h3>
+          <form id="form-expire" novalidate aria-label="Update key TTL form">
+            <div class="form-group">
+              <label class="form-label" for="expire-key">
+                Key <span class="required" aria-hidden="true">*</span>
+              </label>
+              <input
+                type="text"
+                id="expire-key"
+                class="form-input"
+                placeholder="listing:prop:001"
+                aria-label="Cache key to update TTL"
+                aria-required="true"
+                autocomplete="off"
+                spellcheck="false"
+                maxlength="128" />
+              <span class="form-error" role="alert" id="expire-key-error"></span>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="expire-ttl">
+                New TTL (seconds) <span class="required" aria-hidden="true">*</span>
+              </label>
+              <input
+                type="number"
+                id="expire-ttl"
+                class="form-input"
+                placeholder="e.g. 7200"
+                aria-label="New TTL in seconds"
+                aria-required="true"
+                min="1"
+                max="2592000" />
+              <span class="form-error" role="alert" id="expire-ttl-error"></span>
+            </div>
+            <div class="form-footer">
+              <button type="submit" class="btn btn-primary"
+                aria-label="Apply new TTL to key">
+                Apply TTL
+              </button>
+              <button type="button" class="btn btn-secondary" id="btn-persist"
+                aria-label="Remove TTL — make key persistent">
+                ♾ Persist (Remove TTL)
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Info card -->
+        <div class="card" style="background:var(--color-surface-2)">
+          <h3 style="font-size:15px;font-weight:700;margin-bottom:var(--sp-4)">
+            📖 TTL Reference
+          </h3>
+          <table class="data-table" aria-label="TTL value reference table">
+            <thead>
+              <tr>
+                <th scope="col">Duration</th>
+                <th scope="col">Seconds</th>
+                <th scope="col">Use Case</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>5 minutes</td><td class="mono">300</td><td class="muted">User sessions</td></tr>
+              <tr><td>15 minutes</td><td class="mono">900</td><td class="muted">Floor staff auth</td></tr>
+              <tr><td>1 hour</td><td class="mono">3,600</td><td class="muted">Listing cache</td></tr>
+              <tr><td>6 hours</td><td class="mono">21,600</td><td class="muted">Agent reports</td></tr>
+              <tr><td>24 hours</td><td class="mono">86,400</td><td class="muted">Daily stats</td></tr>
+              <tr><td>7 days</td><td class="mono">604,800</td><td class="muted">Historical data</td></tr>
+              <tr><td>30 days</td><td class="mono">2,592,000</td><td class="muted">Max allowed</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Audit Log Panel ── -->
+    <section id="panel-audit" class="panel" aria-label="Audit Log">
+      <div class="panel-header">
+        <h2>Audit Log</h2>
+        <p>Chronological record of all cache operations in this session.</p>
+      </div>
+
+      <div class="flex items-center justify-between mb-4">
+        <div style="font-size:13px;color:var(--color-muted)">
+          Showing last 100 actions · session only
+        </div>
+        <button class="btn btn-ghost btn-sm"
+          onclick="renderAuditLog()"
+          aria-label="Refresh audit log">
+          🔄 Refresh
+        </button>
+      </div>
+
+      <div class="card" style="max-width:720px">
+        <div id="audit-log-list" role="log" aria-label="Audit log entries" aria-live="polite">
+          <!-- Rendered by JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Flush Panel ── -->
+    <section id="panel-flush" class="panel" aria-label="Flush Cache" style="position:relative">
+      <div class="panel-header">
+        <h2>Flush Cache</h2>
+        <p>Permanently delete all keys from the cache. This action cannot be undone.</p>
+      </div>
+
+      <div class="card" style="max-width:500px;border-color:var(--color-danger-dim)">
+        <div style="font-size:40px;margin-bottom:var(--sp-4)" aria-hidden="true">⚠️</div>
+        <h3 style="font-size:16px;font-weight:700;color:var(--color-danger);margin-bottom:var(--sp-3)">
+          Danger Zone — Irreversible Action
+        </h3>
+        <p style="font-size:14px;color:var(--color-muted);line-height:1.6;margin-bottom:var(--sp-5)">
+          Flushing the cache will remove <strong>all</strong> cached property listings, session tokens,
+          configuration values, and analytics data stored in this browser. Staff will experience
+          increased load times until the cache is repopulated.
+        </p>
+        <button class="btn btn-danger btn-lg" id="btn-show-flush"
+          aria-label="Open confirmation dialog to flush all cache entries">
+          🗑 Flush All Keys
+        </button>
+      </div>
+    </section>
+
+    <!-- ── ERD & API Docs Panel ── -->
+    <section id="panel-erd" class="panel" aria-label="ERD and API Documentation">
+      <div class="panel-header">
+        <h2>ERD &amp; API Contracts</h2>
+        <p>Architectural planning — database schema and API design (Capstone 1).</p>
+      </div>
+
+      <!-- ERD -->
+      <div class="section-title">Entity Relationship Diagram</div>
+      <div class="card" style="max-width:800px">
+        <div style="overflow-x:auto">
+          <table class="data-table" aria-label="CacheEntry entity schema">
+            <caption style="text-align:left;font-size:13px;font-weight:700;padding-bottom:var(--sp-3);color:var(--color-accent)">
+              🗄 CacheEntry
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Column</th>
+                <th scope="col">Type</th>
+                <th scope="col">Constraints</th>
+                <th scope="col">Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="mono">key</td><td>VARCHAR(128)</td><td><span class="badge badge-accent">PK</span></td><td class="muted">Unique cache key</td></tr>
+              <tr><td class="mono">value</td><td>JSONB</td><td>NOT NULL</td><td class="muted">Cached payload</td></tr>
+              <tr><td class="mono">namespace</td><td>VARCHAR(64)</td><td>DEFAULT 'default'</td><td class="muted">Logical grouping</td></tr>
+              <tr><td class="mono">created_at</td><td>TIMESTAMP</td><td>NOT NULL</td><td class="muted">Creation time</td></tr>
+              <tr><td class="mono">expires_at</td><td>TIMESTAMP</td><td>NULLABLE</td><td class="muted">NULL = persistent</td></tr>
+              <tr><td class="mono">ttl_seconds</td><td>INTEGER</td><td>NULLABLE</td><td class="muted">Original TTL duration</td></tr>
+            </tbody>
+          </table>
+
+          <div class="divider"></div>
+
+          <table class="data-table" aria-label="PropertyListing entity schema">
+            <caption style="text-align:left;font-size:13px;font-weight:700;padding-bottom:var(--sp-3);color:var(--color-accent)">
+              🏠 PropertyListing
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Column</th>
+                <th scope="col">Type</th>
+                <th scope="col">Constraints</th>
+                <th scope="col">Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="mono">listing_id</td><td>VARCHAR(32)</td><td><span class="badge badge-accent">PK</span></td><td class="muted">Unique listing ID</td></tr>
+              <tr><td class="mono">title</td><td>VARCHAR(200)</td><td>NOT NULL</td><td class="muted">Property title</td></tr>
+              <tr><td class="mono">address</td><td>VARCHAR(300)</td><td>NOT NULL</td><td class="muted">Full address</td></tr>
+              <tr><td class="mono">price</td><td>DECIMAL(12,2)</td><td>NOT NULL</td><td class="muted">Listing price</td></tr>
+              <tr><td class="mono">bedrooms</td><td>SMALLINT</td><td>≥ 0</td><td class="muted">Room count</td></tr>
+              <tr><td class="mono">bathrooms</td><td>SMALLINT</td><td>≥ 0</td><td class="muted">Bathroom count</td></tr>
+              <tr><td class="mono">status</td><td>ENUM</td><td>active|pending|sold</td><td class="muted">Listing state</td></tr>
+              <tr><td class="mono">agent_id</td><td>VARCHAR(32)</td><td><span class="badge badge-muted">FK</span> → Agent</td><td class="muted">Assigned agent</td></tr>
+              <tr><td class="mono">cached_at</td><td>TIMESTAMP</td><td>NULLABLE</td><td class="muted">When pushed to Redis</td></tr>
+            </tbody>
+          </table>
+
+          <div class="divider"></div>
+
+          <table class="data-table" aria-label="AuditLog entity schema">
+            <caption style="text-align:left;font-size:13px;font-weight:700;padding-bottom:var(--sp-3);color:var(--color-accent)">
+              📋 AuditLog
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Column</th>
+                <th scope="col">Type</th>
+                <th scope="col">Constraints</th>
+                <th scope="col">Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="mono">log_id</td><td>UUID</td><td><span class="badge badge-accent">PK</span></td><td class="muted">Auto-generated</td></tr>
+              <tr><td class="mono">action</td><td>ENUM</td><td>SET|GET|DEL|EXPIRE|FLUSH|PERSIST</td><td class="muted">Redis command</td></tr>
+              <tr><td class="mono">cache_key</td><td>VARCHAR(128)</td><td>NOT NULL</td><td class="muted">Affected key</td></tr>
+              <tr><td class="mono">user_id</td><td>VARCHAR(64)</td><td>NULLABLE</td><td class="muted">Operator identity</td></tr>
+              <tr><td class="mono">timestamp</td><td>TIMESTAMP</td><td>NOT NULL</td><td class="muted">Operation time</td></tr>
+              <tr><td class="mono">metadata</td><td>JSONB</td><td>NULLABLE</td><td class="muted">Extra context</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- API Contracts -->
+      <div class="section-title">API Contracts</div>
+      <div class="card" style="max-width:800px">
+        <table class="data-table" aria-label="API endpoint contracts">
+          <thead>
+            <tr>
+              <th scope="col">Endpoint</th>
+              <th scope="col">Method</th>
+              <th scope="col">Auth</th>
+              <th scope="col">Description</th>
+              <th scope="col">Success</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="mono">/cache/set</td>
+              <td><span class="badge badge-success">POST</span></td>
+              <td class="muted">Bearer</td>
+              <td class="muted">Store key + optional TTL</td>
+              <td class="mono">200 { ok: true }</td>
+            </tr>
+            <tr>
+              <td class="mono">/cache/get/:key</td>
+              <td><span class="badge badge-accent">GET</span></td>
+              <td class="muted">Bearer</td>
+              <td class="muted">Retrieve value by key</td>
+              <td class="mono">200 / 404</td>
+            </tr>
+            <tr>
+              <td class="mono">/cache/del/:key</td>
+              <td><span class="badge badge-danger">DELETE</span></td>
+              <td class="muted">Bearer</td>
+              <td class="muted">Remove a single key</td>
+              <td class="mono">200 { deleted: true }</td>
+            </tr>
+            <tr>
+              <td class="mono">/cache/keys</td>
+              <td><span class="badge badge-accent">GET</span></td>
+              <td class="muted">Bearer</td>
+              <td class="muted">Glob-pattern key search</td>
+              <td class="mono">200 { keys: [] }</td>
+            </tr>
+            <tr>
+              <td class="mono">/cache/expire/:key</td>
+              <td><span class="badge badge-warning">PATCH</span></td>
+              <td class="muted">Bearer</td>
+              <td class="muted">Update TTL on existing key</td>
+              <td class="mono">200 { ok: true }</td>
+            </tr>
+            <tr>
+              <td class="mono">/cache/flush</td>
+              <td><span class="badge badge-danger">DELETE</span></td>
+              <td class="muted">Admin</td>
+              <td class="muted">Wipe entire namespace</td>
+              <td class="mono">200 { ok: true }</td>
+            </tr>
+            <tr>
+              <td class="mono">/cache/stats</td>
+              <td><span class="badge badge-accent">GET</span></td>
+              <td class="muted">Bearer</td>
+              <td class="muted">Return hit/miss/size metrics</td>
+              <td class="mono">200 { stats: {} }</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Security note -->
+      <div class="section-title">Security &amp; NFRs</div>
+      <div class="card-grid-2" style="max-width:800px">
+        <div class="card card-sm" style="background:var(--color-success-dim);border-color:hsl(142 55% 45%/.3)">
+          <div style="font-weight:700;font-size:14px;color:var(--color-success);margin-bottom:var(--sp-2)">
+            ✅ Implemented
+          </div>
+          <ul style="font-size:13px;color:var(--color-muted);display:flex;flex-direction:column;gap:var(--sp-2)">
+            <li>· XSS sanitization on all inputs</li>
+            <li>· ARIA labels on all interactive elements</li>
+            <li>· Keyboard navigation support</li>
+            <li>· Loading indicators for async ops</li>
+            <li>· Empty state messages</li>
+            <li>· Field-level validation (red highlight)</li>
+            <li>· Analytics telemetry (console)</li>
+            <li>· No hardcoded secrets or API keys</li>
+          </ul>
+        </div>
+        <div class="card card-sm" style="background:var(--color-accent-dim);border-color:hsl(220 80% 62%/.3)">
+          <div style="font-weight:700;font-size:14px;color:var(--color-accent);margin-bottom:var(--sp-2)">
+            📋 Production Upgrade Path
+          </div>
+          <ul style="font-size:13px;color:var(--color-muted);display:flex;flex-direction:column;gap:var(--sp-2)">
+            <li>· Replace localStorage with Redis 7.x server</li>
+            <li>· Add JWT Bearer auth to all endpoints</li>
+            <li>· POST telemetry to analytics endpoint</li>
+            <li>· Add rate-limiting middleware</li>
+            <li>· TLS for all API traffic</li>
+            <li>· Role-based access (viewer/admin)</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /main-content -->
+</div><!-- /app-wrapper -->
+
+<!-- ── Flush Confirmation Modal ── -->
+<div class="modal-backdrop" id="flush-modal"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="flush-modal-title"
+  aria-describedby="flush-modal-desc">
+  <div class="modal">
+    <h3 id="flush-modal-title" style="color:var(--color-danger)">⚠️ Confirm Cache Flush</h3>
+    <p id="flush-modal-desc">
+      You are about to permanently delete
+      <strong id="flush-key-count">0</strong> key(s) from the cache.
+      This cannot be undone. Property listing staff will experience
+      cache misses until data is repopulated.
+    </p>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="btn-cancel-flush"
+        aria-label="Cancel — do not flush the cache">
+        Cancel
+      </button>
+      <button class="btn btn-danger" id="btn-confirm-flush"
+        aria-label="Confirm flush — delete all cache entries">
+        🗑 Yes, Flush Cache
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast Container ── -->
+<div class="toast-container" id="toast-container"
+  aria-label="Notification area"
+  role="region"
+  aria-live="polite"
+  aria-atomic="false">
+</div>
+
+<!-- ── Scripts (load order matters) ── -->
+<script src="js/sanitizer.js"></script>
+<script src="js/analytics.js"></script>
+<script src="js/redis-engine.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>
